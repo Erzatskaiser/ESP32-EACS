@@ -1,3 +1,5 @@
+![Alt text](./resources/eacs.png "ESP32-EACS")
+
 # **ESP32 Electronic Access Control System (EACS)**
 
 This project implements an access control system using the ESP32 SoC and the MFRC522 RFID reader/writer. At a high level, the system works as follows: users scan their access cards, and the associated
