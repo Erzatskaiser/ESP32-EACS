@@ -1,3 +1,7 @@
 eacs_hardware/#auto_saved_files#
 eacs_hardware/eacs_hardware-backups/
 eacs_hardware/~eacs_hardware.kicad_sch.lck
+eacs_software/.cache/
+eacs_software/.devcontainer/
+eacs_software/.vscode/
+eacs_software/build/
