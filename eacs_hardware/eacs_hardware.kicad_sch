@@ -5216,6 +5216,20 @@
 		)
 		(uuid ae09dca1-7014-4d1e-8d3d-9e11d96abcba)
 	)
+	(text "0.1"
+		(exclude_from_sim no)
+		(at 271.018 193.548 0)
+		(effects
+			(font
+				(face "3270 Nerd Font")
+				(size 2.032 2.032)
+				(thickness 0.254)
+				(bold yes)
+				(color 0 0 0 1)
+			)
+		)
+		(uuid "05e68fb2-eded-474e-b3ea-f559c57f0bdc")
+	)
 	(text "5V Regulator"
 		(exclude_from_sim no)
 		(at 112.268 95.758 0)
@@ -5242,6 +5256,20 @@
 			)
 		)
 		(uuid "4368f52e-429b-4916-b746-241bd0242b82")
+	)
+	(text "23 December 2024\n"
+		(exclude_from_sim no)
+		(at 216.408 193.802 0)
+		(effects
+			(font
+				(face "3270 Nerd Font")
+				(size 2.032 2.032)
+				(thickness 0.254)
+				(bold yes)
+				(color 0 0 0 1)
+			)
+		)
+		(uuid "537a0fcf-c374-4aa5-ae7f-d83b5b4462fe")
 	)
 	(text "Full-wave rectifier"
 		(exclude_from_sim no)
