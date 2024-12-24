@@ -1,11 +1,6 @@
 ﻿// Header file
 #include "../header/rgb.hpp"
 
-#include <cstdint>
-
-#include "driver/ledc.h"
-#include "hal/ledc_types.h"
-
 // RGB LED Class constructor
 RGB_LED::RGB_LED(gpio_num_t R, gpio_num_t G, gpio_num_t B) {
   // Store pin numbers
