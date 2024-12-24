@@ -1,9 +1,6 @@
 // Header file
 #include "../header/buzzer.hpp"
 
-#include "driver/ledc.h"
-#include "hal/ledc_types.h"
-
 // Buzzer class constructor
 Buzzer::Buzzer(gpio_num_t in, ledc_timer_t timer, ledc_channel_t chan) {
   // Store pin number

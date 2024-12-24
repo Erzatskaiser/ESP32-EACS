@@ -1,8 +1,6 @@
 ﻿// Header file
 #include "../header/rgb.hpp"
 
-#include "driver/ledc.h"
-
 // RGB LED Class constructor
 RGB_LED::RGB_LED(gpio_num_t R, gpio_num_t G, gpio_num_t B, ledc_timer_t timer,
                  ledc_channel_t r_chan, ledc_channel_t g_chan,
