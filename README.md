@@ -5,7 +5,7 @@
 This project implements an access control system using the ESP32 SoC and the MFRC522 RFID reader/writer. At a high level, the system works as follows: users scan their access cards, and the associated
 ID is compared against a local ID store. If the ID is not found in this local store, it is updated based on some predefined online store. Further comparison then occurs, determining whether or not the
 user is granted access or not. The device keeps track of access history, which it publishes to the cloud every 12 hours. The repository contains the schematics and board layout of the device
-(under _eacs_hardware_ with full schematics also available [here](./resources/schematics.pdf)), as well as the required software (under _eacs_software_). Note that due to the RC522 development board used, the current device works only with cards operating at 13.56MHz.
+(under _eacs_hardware_ with full schematics also available [here](./resources/schematics.pdf)), as well as the required software (under _eacs_software_). To facilitate interaction with hardware components, the project implements reusable classes to abstract the RGB LED, buzzer, and MFRC522.
 
 ## Steps to run
 Assuming appropriate hardware is available, the project can be built and flashed to the microcontroller by following these steps:
