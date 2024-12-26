@@ -1,6 +1,8 @@
 // Header file
 #include "../header/buzzer.hpp"
 
+#include "soc/clk_tree_defs.h"
+
 // Buzzer class constructor
 Buzzer::Buzzer(gpio_num_t in, ledc_timer_t timer, ledc_channel_t chan) {
   // Store pin number
@@ -15,7 +17,7 @@ Buzzer::Buzzer(gpio_num_t in, ledc_timer_t timer, ledc_channel_t chan) {
 
   // PWM timer configuration
   const ledc_timer_config_t timer_conf{LEDC_HIGH_SPEED_MODE, LEDC_TIMER_8_BIT,
-                                       timer, 5000};
+                                       timer, 5000, LEDC_AUTO_CLK};
   ledc_timer_config(&timer_conf);
 
   // PWM channel configuration

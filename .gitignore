@@ -5,3 +5,4 @@ eacs_software/.cache/
 eacs_software/.devcontainer/
 eacs_software/.vscode/
 eacs_software/build/
+eacs_hardware/_autosave*

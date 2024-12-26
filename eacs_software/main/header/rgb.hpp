@@ -24,5 +24,5 @@ class RGB_LED {
   uint8_t colors[3]{0, 0, 0};
   ledc_timer_t time{LEDC_TIMER_0};
   ledc_channel_t chans[3]{LEDC_CHANNEL_0, LEDC_CHANNEL_1, LEDC_CHANNEL_2};
-  void updateColor(uint8_t* color);
+  void updateColor();
 };
