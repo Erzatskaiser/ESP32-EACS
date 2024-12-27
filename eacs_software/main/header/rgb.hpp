@@ -3,6 +3,8 @@
 // Header files
 #include "driver/gpio.h"
 #include "driver/ledc.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 
 // RGB LED Class
 class RGB_LED {
@@ -12,6 +14,8 @@ class RGB_LED {
           ledc_channel_t r_chan = LEDC_CHANNEL_0,
           ledc_channel_t g_chan = LEDC_CHANNEL_1,
           ledc_channel_t b_chan = LEDC_CHANNEL_2);
+  void fadeColor(uint8_t* colors, unsigned int steps = 5,
+                 unsigned int delay = 200);
   void setColor(uint8_t* colors);
   void setRed(uint8_t R);
   void setGreen(uint8_t G);

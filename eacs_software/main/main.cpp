@@ -6,6 +6,7 @@
 // HAL headers
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "portmacro.h"
 
 // RGB LED pins
 #define R_PIN GPIO_NUM_12
@@ -21,8 +22,14 @@ extern "C" void app_main() {
 
   // Initialize and turn on LED
   RGB_LED viz{R_PIN, G_PIN, B_PIN};
-  uint8_t color1[3]{255, 190, 80};
-  uint8_t color2[3]{80, 190, 255};
+  uint8_t color1[3]{255, 255, 255};
+  uint8_t color2[3]{30, 150, 255};
 
-  test_rgb_led(viz, color1, color2, 2000);
+  // Initial test
+  // test_rgb_led(viz, color1, color2, 2000);
+
+  // Set color and fade LED
+  viz.setColor(color1);
+  vTaskDelay(1000 / portTICK_PERIOD_MS);
+  viz.fadeColor(color2);
 }

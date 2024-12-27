@@ -1,9 +1,6 @@
 ﻿// Header file
 #include "../header/rgb.hpp"
 
-#include "driver/ledc.h"
-#include "hal/ledc_types.h"
-
 // RGB LED Class constructor
 RGB_LED::RGB_LED(gpio_num_t R, gpio_num_t G, gpio_num_t B, ledc_timer_t timer,
                  ledc_channel_t r_chan, ledc_channel_t g_chan,
@@ -45,6 +42,37 @@ void RGB_LED::updateColor() {
     ledc_set_duty_and_update(LEDC_LOW_SPEED_MODE, chans[i],
                              static_cast<uint32_t>(*color), 0);
     ++color;
+  }
+}
+
+// fadeColor: (uint8_t*) --> (none)
+// Fades the color of the LED, updates state
+void RGB_LED::fadeColor(uint8_t* color, unsigned int steps,
+                        unsigned int delay) {
+  // Read target color
+  uint8_t target[3];
+  for (size_t i = 0; i < 3; i++) {
+    target[i] = *color;
+    color++;
+  }
+
+  // Compute differences in color values
+  int red_diff = target[0] - colors[0];
+  int green_diff = target[1] - colors[1];
+  int blue_diff = target[2] - colors[2];
+
+  // Perform fading in steps
+  for (size_t i = 0; i < steps; i++) {
+    // Compute current RGB values
+    colors[0] += red_diff / steps;
+    colors[1] += green_diff / steps;
+    colors[2] += blue_diff / steps;
+
+    // Update color
+    updateColor();
+
+    // Delay to give fading effect
+    vTaskDelay(delay / portTICK_PERIOD_MS);
   }
 }
 
