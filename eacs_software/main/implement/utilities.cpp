@@ -1,10 +1,6 @@
 // Custom headers
 #include "../header/utilities.hpp"
 
-// HAL headers
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
-
 // test_rgb_led: (RGB_LED, uint8_t*, uint8_t*, int) --> (none)
 // Tests an RGB LED by setting it to one color then another
 void test_rgb_led(RGB_LED& led, uint8_t* color1, uint8_t* color2, int time) {
