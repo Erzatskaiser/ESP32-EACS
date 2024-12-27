@@ -1,14 +1,10 @@
 // Custom headers
 #include "./header/buzzer.hpp"
 #include "./header/rgb.hpp"
-
-// STL headers
-#include <iostream>
+#include "./header/utilities.hpp"
 
 // HAL headers
-#include "esp_system.h"
 #include "freertos/FreeRTOS.h"
-#include "freertos/idf_additions.h"
 #include "freertos/task.h"
 
 // RGB LED pins
@@ -25,25 +21,8 @@ extern "C" void app_main() {
 
   // Initialize and turn on LED
   RGB_LED viz{R_PIN, G_PIN, B_PIN};
-  uint8_t color1[3]{255, 0, 0};
-  uint8_t color2[3]{0, 255, 0};
-  while (1) {
-    viz.setColor(color1);
-    std::cout << 1 << std::endl;
-    vTaskDelay(100 / portTICK_PERIOD_MS);
-    viz.setColor(color2);
-    std::cout << 2 << std::endl;
-  }
+  uint8_t color1[3]{255, 190, 80};
+  uint8_t color2[3]{80, 190, 255};
 
-  // std::cout << '1' << std::endl;
-
-  // Initialize and turn on the BUZZER_PIN
-  // Buzzer audio{BUZZER_PIN, LEDC_TIMER_1, LEDC_CHANNEL_3};
-  // audio.on();
-
-  // std::cout << '2' << std::endl;
-
-  // Initialize MFRC522
-
-  // Start bluetooth task and card reading task (How to implement ISR?)
+  test_rgb_led(viz, color1, color2, 2000);
 }

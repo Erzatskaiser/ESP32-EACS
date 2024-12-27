@@ -40,12 +40,11 @@ RGB_LED::RGB_LED(gpio_num_t R, gpio_num_t G, gpio_num_t B, ledc_timer_t timer,
 // setColor: (uint8_t, uint8_t, uint8_t) --> (none)
 // Sets the color of the LED based on current values
 void RGB_LED::updateColor() {
+  uint8_t* color = colors;
   for (size_t i = 0; i < 3; i++) {
-    /*ledc_set_duty_and_update(LEDC_HIGH_SPEED_MODE, chans[i],
-                             static_cast<uint32_t>(*color), 0);*/
-    ledc_set_duty(LEDC_LOW_SPEED_MODE, chans[i],
-                  static_cast<uint32_t>(colors[i]));
-    ledc_update_duty(LEDC_LOW_SPEED_MODE, chans[i]);
+    ledc_set_duty_and_update(LEDC_LOW_SPEED_MODE, chans[i],
+                             static_cast<uint32_t>(*color), 0);
+    ++color;
   }
 }
 
