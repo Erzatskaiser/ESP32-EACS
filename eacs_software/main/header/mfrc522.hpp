@@ -1,20 +1,46 @@
 #pragma once
 
 // HAL imports
+#include "driver/gpio.h"
 #include "driver/spi_common.h"
+#include "soc/gpio_num.h"
 
 class MFRC522 {
  public:
   MFRC522();
 
  private:
-  const uint8_t fifo_size = 64;   // Size of FIFO buffer on chip
-  const uint8_t unused_pin = -1;  // Representation for unused pin
-  bool is_spi = true;             // Is SPI being used (default)
-  bool is_i2c = false;            // Is I2C being used
+  // Device and protocol constants
+  const uint8_t fifo_size = 64;  /* Size of FIFO buffer on chip */
+  const uint8_t unused_pin = -1; /* Representation for unused pin */
+  /* Mifare constants */
+
+  // Configuration variables
+  gpio_num_t reset_pin = GPIO_NUM_0;
+  gpio_num_t chipSelect_pin = GPIO_NUM_1;
+  bool is_spi = true;  /* Is SPI being used (default) */
+  bool is_i2c = false; /* Is I2C being used */
 
   // Shift addresses to obtain SPI address
   uint8_t get_spi_address(uint8_t address);
+
+  // MFRC522 version 1.0 self-test results
+  const uint8_t fifo_test_v1[64]{
+      0x00, 0xC6, 0X37, 0xD5, 0x32, 0xB7, 0x57, 0x5C, 0XC2, 0xD8, 0x7C,
+      0x4D, 0xD9, 0x70, 0xC7, 0x73, 0x10, 0xE6, 0xD2, 0xAA, 0x5E, 0xA1,
+      0x3E, 0x5A, 0x14, 0xAF, 0x30, 0x61, 0xC9, 0x70, 0xDB, 0x2E, 0x64,
+      0x22, 0x72, 0xB5, 0xBD, 0x65, 0xF4, 0xEC, 0x22, 0xBC, 0xD3, 0x72,
+      0x35, 0xCD, 0xAA, 0x41, 0x1F, 0xA7, 0xF3, 0x63, 0x14, 0xDE, 0x7E,
+      0x02, 0xD9, 0x0F, 0xB5, 0x5E, 0x25, 0x1D, 0x29, 0x79};
+
+  // MFRC522 version2.0 self-test results
+  const uint8_t fifo_test_v2[64]{
+      0x00, 0xEB, 0x66, 0xBA, 0x57, 0xBF, 0x23, 0x95, 0xD0, 0xE3, 0x0D,
+      0x3D, 0x27, 0x89, 0x5C, 0xDE, 0x9D, 0x3B, 0xA7, 0x00, 0x21, 0x5B,
+      0x89, 0x82, 0x51, 0x3A, 0xEB, 0x02, 0x0C, 0xA5, 0x00, 0x49, 0x7C,
+      0x84, 0x4D, 0xB3, 0xCC, 0xD2, 0x1B, 0x81, 0x5D, 0x48, 0x76, 0xD5,
+      0x71, 0x61, 0x21, 0xA9, 0x86, 0x96, 0x83, 0x38, 0xCF, 0x9D, 0x5B,
+      0x6D, 0xDC, 0x15, 0xBA, 0x3E, 0x7D, 0x95, 0x3B, 0x2F};
 
   // Commands of the MFRC522 ship
   enum mfrc522_commands : uint8_t {
@@ -30,7 +56,47 @@ class MFRC522 {
     SoftReset = 0xF,  /* Reset MFRC522 */
   };
 
+  // Commands sent to PICC (defined by standards)
+  enum picc_commands : uint8_t {
+
+    // Manage communiation with multiple PICCs (ISO 14443-3)
+    REQA = 0x26,       /* Request - Type A*/
+    WUPA = 0x52,       /* Wake-up - Type A */
+    AC_SEL_CL1 = 0x93, /* Anti-collision or Select, CL1 */
+    HALT = 0x50,       /* Halt command - Type A */
+    CascTag = 0x88,    /* Cascade Tag, used during collision */
+    AC_SEL_CL2 = 0x95, /* Anti-collision or Select, CL2 */
+    AC_SEL_CL3 = 0x97, /* Anti-collision or Select, CL3 */
+    ATR = 0xE0,        /* Answer to Reset */
+
+    // Commands for MIFARE Classic
+    AUTH_KEY_A = 0x60, /* Authenticate with Key A */
+    AUTH_KEY_B = 0x61, /* Authenticate with Key B */
+    READ = 0x30,       /* Read nlock from authenticated sector */
+    WRITE = 0xA0,      /* Write block from authenticated sector */
+    DECREMENT = 0xC0,  /* Decrement block content */
+    INCREMENT = 0xC1,  /* Increment block content */
+    RESTORE = 0xC2,    /* Restore previous value */
+    TRANSFER = 0xB0,   /* Move data between block and buffer*/
+
+    // Additional commands for MIFARE Ultralight
+    UL_WRITE = 0xA2 /* Writes 4 bytes */
+  };
+
+  // Values for the RFCfg register (receiver gain configuration)
+  enum mfrc522_recv_gain : uint8_t {
+    dB18 = 0x00,
+    db23 = 0x01,
+    db18_2 = 0x02,
+    db23_3 = 0x3,
+    db33 = 0x04,
+    db38 = 0x05,
+    db43 = 0x06,
+    db48 = 0x07
+  };
+
   // Registers of the MFRC522 chip
+  // See 9.2 and 9.3 at https://nxp.com/docs/en/data-sheet/MFRC522.pdf
   enum mfrc522_registers : uint8_t {
 
     // Command and status registers
