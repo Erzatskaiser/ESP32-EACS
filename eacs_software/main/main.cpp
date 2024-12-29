@@ -6,7 +6,6 @@
 // HAL headers
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "portmacro.h"
 
 // RGB LED pins
 #define R_PIN GPIO_NUM_12
@@ -22,14 +21,16 @@ extern "C" void app_main() {
 
   // Initialize and turn on LED
   RGB_LED viz{R_PIN, G_PIN, B_PIN};
-  uint8_t color1[3]{255, 255, 255};
-  uint8_t color2[3]{30, 150, 255};
+  viz.on();
 
-  // Initial test
-  // test_rgb_led(viz, color1, color2, 2000);
+  // Initialize buzzer
+  Buzzer audio{BUZZER_PIN, LEDC_TIMER_1, LEDC_CHANNEL_3};
 
-  // Set color and fade LED
-  viz.setColor(color1);
-  vTaskDelay(1000 / portTICK_PERIOD_MS);
-  viz.fadeColor(color2);
+  // Initialize shared variables (user_id)
+
+  // RFID task:
+  // --> Start SPI bus
+  // --> Initialize MFRC522 device
+
+  // Initialize bluetooth
 }

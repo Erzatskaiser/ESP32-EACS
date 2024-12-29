@@ -2,7 +2,7 @@
 #include "./rgb.hpp"
 
 // HAL headers
-#include "freertos/reeRTOS.h"
+#include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
 // test_rgb_led: (RGB_LED, uint8_t*, uint8_t*) --> (none)
