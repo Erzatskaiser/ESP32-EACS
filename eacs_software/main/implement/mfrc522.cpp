@@ -51,11 +51,81 @@ MFRC522::MFRC522(gpio_num_t* pins, core_num core) {
     esp_err_t add_device = spi_bus_add_device(host, &device_conf, &spi_handle);
 
     // Successfully added device, break from loop
-    if (add_device == ESP_OK) {
-      /* Write the CS line HIGH */
-      break;
-    };
+    if (add_device == ESP_OK) break;
   }
+}
+
+// setRegisterWithMask(mfrc522_register, uint8_t*) --> (mfrc522_status)
+// Sets bits within specified register using provided mask
+mfrc522_status MFRC522::setRegisterWithMask(mfrc522_register reg,
+                                            uint8_t mask) {
+  // Obtain the current value
+  uint8_t currVal = 0x00;
+  mfrc522_status read_status = readRegister(reg, &currVal);
+  if (read_status != MFRC522_OK) return MFRC522_ERR;
+
+  // Apply the mask to the current value
+  uint8_t newVal = currVal | mask;
+
+  // Write the new value
+  mfrc522_status write_status = writeRegister(reg, newVal);
+  if (write_status != MFRC522_OK) return MFRC522_ERR;
+
+  // Return status
+  return MFRC522_OK;
+}
+
+// clearRegisterWithMask: (mfrc522_register, uint8_t*) --> (mfrc522_status)
+// Clear bits within specified register using provided mask
+mfrc522_status MFRC522::clearRegisterWithMask(mfrc522_register reg,
+                                              uint8_t mask) {
+  // Obtain the current value
+  uint8_t currVal = 0x00;
+  mfrc522_status read_status = readRegister(reg, &currVal);
+  if (read_status != MFRC522_OK) return MFRC522_ERR;
+
+  // Apply the mask to the current value
+  uint8_t newVal = currVal & ~mask;
+
+  // Write the new value
+  mfrc522_status write_status = writeRegister(reg, newVal);
+  if (write_status != MFRC522_OK) return MFRC522_ERR;
+
+  // Return status
+  return MFRC522_OK;
+}
+
+// writeRegister: (mfrc522_register, uint8_t*) --> (mfrc522_status)
+// Write data in buffer into register, returning operation status
+mfrc522_status MFRC522::writeRegister(mfrc522_register reg, uint8_t in) {
+  // Shift address bits due to SPI protocol
+  uint8_t addr = reg << 1;
+
+  // Instantiate and zero out transaction
+  spi_transaction_t write_transact;
+  memset(&write_transact, 0, sizeof(write_transact));
+
+  // Initialize first transaction (address)
+  write_transact.length = 8;
+  write_transact.rxlength = 0;
+  write_transact.tx_buffer = &addr;
+
+  // Transmit transaction (thread-safe)
+  taskENTER_CRITICAL(&mfrc522_lock);
+  esp_err_t op1 = spi_device_transmit(spi_handle, &write_transact);
+  taskEXIT_CRITICAL(&mfrc522_lock);
+
+  // Modify for second transaction (data)
+  write_transact.tx_buffer = &in;
+
+  // Transmit transaction (thread-safe)
+  taskENTER_CRITICAL(&mfrc522_lock);
+  esp_err_t op2 = spi_device_transmit(spi_handle, &write_transact);
+  taskEXIT_CRITICAL(&mfrc522_lock);
+
+  // Return status code
+  if (op1 == ESP_OK && op2 == ESP_OK) return MFRC522_OK;
+  return MFRC522_ERR;
 }
 
 // readRegister: (mfrc522_register, uint8_t*) --> (mfrc522_status)
@@ -75,7 +145,7 @@ mfrc522_status MFRC522::readRegister(mfrc522_register reg, uint8_t* out) {
   read_transact.tx_buffer = &addr;
   read_transact.rx_buffer = &addr;
 
-  // Transmit the transaction (thread-safe)
+  // Transmit transaction (thread-safe)
   taskENTER_CRITICAL(&mfrc522_lock);
   esp_err_t op1 = spi_device_transmit(spi_handle, &read_transact);
   taskEXIT_CRITICAL(&mfrc522_lock);

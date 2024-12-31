@@ -186,7 +186,7 @@ class MFRC522 {
 
   // Private methods
   mfrc522_status readRegister(mfrc522_register reg, uint8_t* out);
-  mfrc522_status writeRegister(mfrc522_register reg, uint8_t* in);
-  mfrc522_status clearRegisterWithMask(mfrc522_register reg, uint8_t* mask);
-  mfrc522_status setRegisterWithMask(mfrc522_register reg, uint8_t* mask);
+  mfrc522_status writeRegister(mfrc522_register reg, uint8_t in);
+  mfrc522_status clearRegisterWithMask(mfrc522_register reg, uint8_t mask);
+  mfrc522_status setRegisterWithMask(mfrc522_register reg, uint8_t mask);
 };
