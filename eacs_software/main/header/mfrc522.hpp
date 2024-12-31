@@ -1,18 +1,35 @@
-#pragma once
+﻿#pragma once
 
 // Custom headers
 #include "./types.hpp"
 
-// HAL imports
+// STL headers
+#include <cstring>
+
+// Vendor HAL headers
 #include "driver/gpio.h"
 #include "driver/spi_common.h"
 #include "driver/spi_master.h"
 #include "esp_intr_types.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/idf_additions.h"
+
+// Status codes for class methods
+enum mfrc522_status : uint8_t {
+  MFRC522_OK = 0x00,      /* Success code */
+  MFRC522_ERR = 0x01,     /* Generic error code */
+  MFRC522_COLL = 0x02,    /* Collision error code */
+  MFRC522_TIMEOUT = 0x03, /* Timeout error code */
+  MFRC522_FULL = 0x04,    /* Buffer is not big enough */
+  MFRC522_CRC = 0x05,     /* CRC_A does not match */
+  MFRC522_NAK = 0xFF,     /* PICC responded with NAK */
+};
 
 // MFRC522 Class
 class MFRC522 {
  public:
-  MFRC522(gpio_num_t* pins, comm_mode protocol = SPI, core_num core = CORE0);
+  MFRC522(gpio_num_t* pins, core_num core = CORE0);
+  mfrc522_status initializeChip();
 
  private:
   // Device and protocol constants
@@ -27,8 +44,11 @@ class MFRC522 {
   bool is_i2c = false;  /* Is I2C being used */
   bool is_uart = false; /* Is UART being used */
 
-  // Shift addresses to obtain SPI address
-  uint8_t get_spi_address(uint8_t address);
+  // Spinlock to enforce mutual exclusion
+  portMUX_TYPE mfrc522_lock = portMUX_INITIALIZER_UNLOCKED;
+
+  // Communication handles
+  spi_device_handle_t spi_handle;
 
   // MFRC522 version 1.0 self-test results
   const uint8_t fifo_test_v1[64]{
@@ -47,17 +67,6 @@ class MFRC522 {
       0x84, 0x4D, 0xB3, 0xCC, 0xD2, 0x1B, 0x81, 0x5D, 0x48, 0x76, 0xD5,
       0x71, 0x61, 0x21, 0xA9, 0x86, 0x96, 0x83, 0x38, 0xCF, 0x9D, 0x5B,
       0x6D, 0xDC, 0x15, 0xBA, 0x3E, 0x7D, 0x95, 0x3B, 0x2F};
-
-  // Status codes for helper functions
-  enum mfrc522_status : uint8_t {
-    MFRC522_OK = 0x00,      /* Success code */
-    MFRC522_ERR = 0x01,     /* Generic error code */
-    MFRC522_COLL = 0x02,    /* Collision error code */
-    MFRC522_TIMEOUT = 0x03, /* Timeout error code */
-    MFRC522_FULL = 0x04,    /* Buffer is not big enough */
-    MFRC522_CRC = 0x05,     /* CRC_A does not match */
-    MFRC522_NAK = 0xFF,     /* PICC responded with NAK */
-  };
 
   // Commands of the MFRC522 ship
   enum mfrc522_commands : uint8_t {
@@ -114,7 +123,7 @@ class MFRC522 {
 
   // Registers of the MFRC522 chip
   // See 9.2 and 9.3 at https://nxp.com/docs/en/data-sheet/MFRC522.pdf
-  enum mfrc522_registers : uint8_t {
+  enum mfrc522_register : uint8_t {
 
     // Command and status registers
     CommandReg = 0x01,
@@ -174,4 +183,10 @@ class MFRC522 {
     TestDAC2Reg = 0x3A,
     TestADCReg = 0x3B
   };
+
+  // Private methods
+  mfrc522_status readRegister(mfrc522_register reg, uint8_t* out);
+  mfrc522_status writeRegister(mfrc522_register reg, uint8_t* in);
+  mfrc522_status clearRegisterWithMask(mfrc522_register reg, uint8_t* mask);
+  mfrc522_status setRegisterWithMask(mfrc522_register reg, uint8_t* mask);
 };
