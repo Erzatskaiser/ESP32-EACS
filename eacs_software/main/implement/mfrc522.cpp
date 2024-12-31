@@ -55,7 +55,15 @@ MFRC522::MFRC522(gpio_num_t* pins, core_num core) {
   }
 }
 
-// setRegisterWithMask(mfrc522_register, uint8_t*) --> (mfrc522_status)
+// initializeChip: (none) --> (mfrc522_status)
+// Initializes the MFRC522 chip
+mfrc522_status MFRC522::initializeChip() {
+  // TODO: Check if hard reset needed :reset the MFRC522 chip using the rst pin
+  //  --> Ekse, do sft reset
+  //  TODO: Write to various registers for setup
+}
+
+// setRegisterWithMask: (mfrc522_register, uint8_t*) --> (mfrc522_status)
 // Sets bits within specified register using provided mask
 mfrc522_status MFRC522::setRegisterWithMask(mfrc522_register reg,
                                             uint8_t mask) {

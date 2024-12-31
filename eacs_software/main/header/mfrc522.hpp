@@ -30,6 +30,13 @@ class MFRC522 {
  public:
   MFRC522(gpio_num_t* pins, core_num core = CORE0);
   mfrc522_status initializeChip();
+  mfrc522_status resetChip();
+  mfrc522_status selfTest();
+  mfrc522_status antennaOn();
+  mfrc522_status antennaOff();
+  mfrc522_status adjustAntennaGain();
+  mfrc522_status powerDown();
+  mfrc522_status powerUp();
 
  private:
   // Device and protocol constants
@@ -40,9 +47,6 @@ class MFRC522 {
   // Configuration variables
   gpio_num_t reset_pin = GPIO_NUM_0;
   gpio_num_t chipSelect_pin = GPIO_NUM_1;
-  bool is_spi = true;   /* Is SPI being used (default) */
-  bool is_i2c = false;  /* Is I2C being used */
-  bool is_uart = false; /* Is UART being used */
 
   // Spinlock to enforce mutual exclusion
   portMUX_TYPE mfrc522_lock = portMUX_INITIALIZER_UNLOCKED;
