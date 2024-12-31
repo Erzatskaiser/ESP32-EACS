@@ -1,25 +1,31 @@
 #pragma once
 
+// Custom headers
+#include "./types.hpp"
+
 // HAL imports
 #include "driver/gpio.h"
 #include "driver/spi_common.h"
-#include "soc/gpio_num.h"
+#include "driver/spi_master.h"
+#include "esp_intr_types.h"
 
+// MFRC522 Class
 class MFRC522 {
  public:
-  MFRC522();
+  MFRC522(gpio_num_t* pins, comm_mode protocol = SPI, core_num core = CORE0);
 
  private:
   // Device and protocol constants
-  const uint8_t fifo_size = 64;  /* Size of FIFO buffer on chip */
-  const uint8_t unused_pin = -1; /* Representation for unused pin */
-  /* Mifare constants */
+  const uint8_t fifo_size = 64; /* Size of FIFO buffer on chip */
+  const uint8_t key_size = 6;   /* Size of Crypto1 key */
+  const uint8_t mf_ack = 0xA;   /* MIFARE Classic ACK is 0xA */
 
   // Configuration variables
   gpio_num_t reset_pin = GPIO_NUM_0;
   gpio_num_t chipSelect_pin = GPIO_NUM_1;
-  bool is_spi = true;  /* Is SPI being used (default) */
-  bool is_i2c = false; /* Is I2C being used */
+  bool is_spi = true;   /* Is SPI being used (default) */
+  bool is_i2c = false;  /* Is I2C being used */
+  bool is_uart = false; /* Is UART being used */
 
   // Shift addresses to obtain SPI address
   uint8_t get_spi_address(uint8_t address);
@@ -41,6 +47,17 @@ class MFRC522 {
       0x84, 0x4D, 0xB3, 0xCC, 0xD2, 0x1B, 0x81, 0x5D, 0x48, 0x76, 0xD5,
       0x71, 0x61, 0x21, 0xA9, 0x86, 0x96, 0x83, 0x38, 0xCF, 0x9D, 0x5B,
       0x6D, 0xDC, 0x15, 0xBA, 0x3E, 0x7D, 0x95, 0x3B, 0x2F};
+
+  // Status codes for helper functions
+  enum mfrc522_status : uint8_t {
+    MFRC522_OK = 0x00,      /* Success code */
+    MFRC522_ERR = 0x01,     /* Generic error code */
+    MFRC522_COLL = 0x02,    /* Collision error code */
+    MFRC522_TIMEOUT = 0x03, /* Timeout error code */
+    MFRC522_FULL = 0x04,    /* Buffer is not big enough */
+    MFRC522_CRC = 0x05,     /* CRC_A does not match */
+    MFRC522_NAK = 0xFF,     /* PICC responded with NAK */
+  };
 
   // Commands of the MFRC522 ship
   enum mfrc522_commands : uint8_t {
