@@ -25,6 +25,18 @@ enum mfrc522_status : uint8_t {
   MFRC522_NAK = 0xFF,     /* PICC responded with NAK */
 };
 
+// Values for the RFCfg register (receiver gain configuration)
+enum mfrc522_gain : uint8_t {
+  dB18 = 0x00,
+  db23 = 0x01,
+  db18_2 = 0x02,
+  db23_3 = 0x3,
+  db33 = 0x04,
+  db38 = 0x05,
+  db43 = 0x06,
+  db48 = 0x07
+};
+
 // MFRC522 Class
 class MFRC522 {
  public:
@@ -34,10 +46,11 @@ class MFRC522 {
   mfrc522_status selfTest();
   mfrc522_status antennaOn();
   mfrc522_status antennaOff();
-  mfrc522_status adjustAntennaGain();
+  mfrc522_status adjustAntennaGain(mfrc522_gain gain);
+  mfrc522_status getAntennaGain(mfrc522_gain* out);
   mfrc522_status powerDown();
-  mfrc522_status powerUp();
   mfrc522_status hibernate();
+  mfrc522_status wakeup();
 
  private:
   // Device and protocol constants
@@ -112,18 +125,6 @@ class MFRC522 {
 
     // Additional commands for MIFARE Ultralight
     UL_WRITE = 0xA2 /* Writes 4 bytes */
-  };
-
-  // Values for the RFCfg register (receiver gain configuration)
-  enum mfrc522_recv_gain : uint8_t {
-    dB18 = 0x00,
-    db23 = 0x01,
-    db18_2 = 0x02,
-    db23_3 = 0x3,
-    db33 = 0x04,
-    db38 = 0x05,
-    db43 = 0x06,
-    db48 = 0x07
   };
 
   // Registers of the MFRC522 chip

@@ -1,8 +1,6 @@
 // Header file
 #include "../header/mfrc522.hpp"
 
-#include "portmacro.h"
-
 // MFRC522 class constructor
 MFRC522::MFRC522(gpio_num_t* pins, core_num core) {
   // Store pins
@@ -79,31 +77,126 @@ mfrc522_status MFRC522::initializeChip() {
   writeRegister(TReloadReg_Lo, 0xE8);
 
   // Adjust transmit modulation settings
-  writeRegister(TxASKReg, 0x40); /* 100% ASK modulation always */
+  setRegisterWithMask(TxASKReg, 0x40); /* 100% ASK modulation always */
 
   // Adjust mode sttingsn for transmitting and receiving
-  writeRegister(ModeReg, 0x3E); /* CalCRC command has prest value 0xA671 */
+  clearRegisterWithMask(ModeReg,
+                        0x01); /* CalCRC command has prest value 0xA671 */
 
   // Enable the antena driving pins
-  antennaOn();
+  mfrc522_status antenna_op = antennaOn();
+  if (antenna_op != MFRC522_OK) return MFRC522_ERR;
 
   // Retun status
   return MFRC522_OK;
 }
 
-// antennaOn(): (none) --> (mfrc522_status)
-// Enables the antena driving pins
-mfrc522_status MFRC522::antennaOn() { /* Start here */ }
+// wakeup: (none) --> (mfrc522_status)
+// Wake up the MFRC522 module from hibernation
+mfrc522_status MFRC522::wakeup() {
+  // Clear power down bit
+  mfrc522_status status = clearRegisterWithMask(CommandReg, 0x10);
+  if (status != MFRC522_OK) return MFRC522_ERR;
+
+  /* Check that bit has been set, with timeout of 500ms */
+  uint8_t bit_value = 0;
+  readRegister(CommandReg, &bit_value);
+
+  // Loop until either timeout or correct bit value
+  while (1) {
+    // Read new value
+    if ((bit_value & 0x10) != 0x00) {
+      vTaskDelay(1 / portTICK_PERIOD_MS);
+      readRegister(CommandReg, &bit_value);
+    }
+
+    // Successfull completion
+    else
+      return MFRC522_OK;
+  }
+}
+
+// hibernate: (none) --> (mfrc522_status)
+// Hibernate the MFRC522 module (no reset on power on)
+mfrc522_status MFRC522::hibernate() {
+  mfrc522_status status = setRegisterWithMask(CommandReg, 0x10);
+  return status;
+}
+
+// powerDown: (none) --> (mfrc522_status)
+// Turn off the MFRC522 module (reset on power on)
+mfrc522_status MFRC522::powerDown() {
+  esp_err_t op = gpio_set_level(reset_pin, 0);
+  if (op != ESP_OK) return MFRC522_ERR;
+  return MFRC522_OK;
+}
+
+// adjustAntennaGain: (mfrc522_gain) --> (mfrc522_status)
+// Adjusts the gain of the antenna
+mfrc522_status MFRC522::adjustAntennaGain(mfrc522_gain gain) {
+  // Get current antenna gain, checking for error
+  mfrc522_gain out;
+  mfrc522_status read_op = getAntennaGain(&out);
+  if (read_op != MFRC522_OK) return MFRC522_ERR;
+
+  // Check that desired gain is not equal to current gain
+  if (gain == out) return MFRC522_OK;
+
+  // Clear register bits first
+  mfrc522_status clear_op = clearRegisterWithMask(RFCfgReg, 0x70);
+  if (clear_op != MFRC522_OK) return MFRC522_ERR;
+
+  // Make mask, and set value
+  uint8_t mask = gain << 4;
+  mfrc522_status set_op = setRegisterWithMask(RFCfgReg, mask);
+  if (set_op != MFRC522_OK) return MFRC522_ERR;
+
+  // Return status code
+  return MFRC522_OK;
+}
+
+// getAntennaGain: (mfrc522_gain*) --> (mfrc522_status)
+// Get the current gain of the antenna
+mfrc522_status MFRC522::getAntennaGain(mfrc522_gain* out) {
+  // Get the currentn value of the register
+  uint8_t currVal = 0x00;
+  mfrc522_status read_op = readRegister(RFCfgReg, &currVal);
+  if (read_op != MFRC522_OK) return MFRC522_ERR;
+
+  // Mask and shift to get gain value
+  currVal &= 0x70;
+  currVal >>= 4;
+
+  // Write value to output
+  *out = static_cast<mfrc522_gain>(currVal);
+
+  // Return status code
+  return MFRC522_OK;
+}
+
+// antennaOn: (none) --> (mfrc522_status)
+// Enables the antenna driving pins
+mfrc522_status MFRC522::antennaOn() {
+  mfrc522_status result = setRegisterWithMask(TxControlReg, 0x03);
+  return result;
+}
+
+// antennaOff: (none) --> (mfrc522_status)
+// Disables the antenna driving pins
+mfrc522_status MFRC522::antennaOff() {
+  mfrc522_status result = clearRegisterWithMask(TxControlReg, 0x03);
+  return result;
+}
 
 // hardReset: (none) --> (mfrc522_status)
 // Hard reset the MFRC522 chip by writing the reset pin low
 mfrc522_status MFRC522::hardReset() {
   // Write low for tick period
   gpio_set_level(reset_pin, 0);
-  vTaskDelay(portTICK_PERIOD_MS); /* datasheet specifies ~ 100ns */
+  vTaskDelay(1 / portTICK_PERIOD_MS); /* datasheet specifies ~ 100ns */
   gpio_set_level(reset_pin, 1);
-  vTaskDelay(portTICK_PERIOD_MS); /* datasheet specified ~ 38ns for oscillator
-                                     startup */
+  vTaskDelay(1 / portTICK_PERIOD_MS); /* datasheet specified ~ 38ns for
+                                       oscillator startup */
 
   // Read command register to ensure reset succeeded
   uint8_t curr_val;
