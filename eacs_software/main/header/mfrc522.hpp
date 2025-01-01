@@ -37,6 +37,7 @@ class MFRC522 {
   mfrc522_status adjustAntennaGain();
   mfrc522_status powerDown();
   mfrc522_status powerUp();
+  mfrc522_status hibernate();
 
  private:
   // Device and protocol constants
@@ -189,6 +190,7 @@ class MFRC522 {
   };
 
   // Private methods
+  mfrc522_status hardReset();
   mfrc522_status readRegister(mfrc522_register reg, uint8_t* out);
   mfrc522_status writeRegister(mfrc522_register reg, uint8_t in);
   mfrc522_status clearRegisterWithMask(mfrc522_register reg, uint8_t mask);
