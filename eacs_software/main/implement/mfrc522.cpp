@@ -91,6 +91,30 @@ mfrc522_status MFRC522::initializeChip() {
   return MFRC522_OK;
 }
 
+// selfTest: (none) --> (mfrc522_status)
+// Performs a self test of the MFRC522
+mfrc522_status MFRC522::selfTest() {
+  // Perform soft reset
+  // Clear internal buffer, implement Config command
+  // Enable self test - write 0x09 to the AutoTestReg register
+  // Write 0x00 to the FIFO buffer
+  // Start test with CalcCRC command
+  // After test complete, read 64 bytes from FIFO buffer
+}
+
+// resetChip: (none) --> (mfrc522_status)
+// Perform a soft reset of the MRFC522
+mfrc522_status MFRC522::resetChip() {
+  // Set command bits in command register
+  mfrc522_status write_op = setRegisterWithMask(CommandReg, SoftReset);
+
+  // Wait for operation to take effect
+  vTaskDelay(10 / portTICK_PERIOD_MS);
+
+  // Return status code
+  return write_op;
+}
+
 // wakeup: (none) --> (mfrc522_status)
 // Wake up the MFRC522 module from hibernation
 mfrc522_status MFRC522::wakeup() {
@@ -102,8 +126,11 @@ mfrc522_status MFRC522::wakeup() {
   uint8_t bit_value = 0;
   readRegister(CommandReg, &bit_value);
 
-  // Loop until either timeout or correct bit value
-  while (1) {
+  // Get end time
+  uint32_t end_time = (esp_timer_get_time() / 1000) + 500;
+
+  // Loop until timeout
+  while (esp_timer_get_time() <= end_time) {
     // Read new value
     if ((bit_value & 0x10) != 0x00) {
       vTaskDelay(1 / portTICK_PERIOD_MS);
@@ -114,6 +141,8 @@ mfrc522_status MFRC522::wakeup() {
     else
       return MFRC522_OK;
   }
+
+  return MFRC522_ERR;
 }
 
 // hibernate: (none) --> (mfrc522_status)

@@ -11,6 +11,7 @@
 #include "driver/spi_common.h"
 #include "driver/spi_master.h"
 #include "esp_intr_types.h"
+#include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/idf_additions.h"
 
