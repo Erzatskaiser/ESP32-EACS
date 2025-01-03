@@ -41,17 +41,28 @@ enum mfrc522_gain : uint8_t {
 // MFRC522 Class
 class MFRC522 {
  public:
+  // Class constructor
   MFRC522(gpio_num_t* pins, core_num core = CORE0);
+
+  // Chip state and power control
   mfrc522_status initializeChip();
-  mfrc522_status resetChip();
   mfrc522_status selfTest();
+  mfrc522_status powerDown();
+  mfrc522_status hibernate();
+  mfrc522_status wakeup();
+
+  // Chip hardware control
   mfrc522_status antennaOn();
   mfrc522_status antennaOff();
   mfrc522_status adjustAntennaGain(mfrc522_gain gain);
   mfrc522_status getAntennaGain(mfrc522_gain* out);
-  mfrc522_status powerDown();
-  mfrc522_status hibernate();
-  mfrc522_status wakeup();
+
+  // Chip features control
+  mfrc522_status idle();
+  mfrc522_status resetChip();
+  mfrc522_status generateRandomID(uint8_t* out);
+  mfrc522_status calculateCRC(uint8_t* out, uint8_t length);
+  mfrc522_status calculateCRC(uint8_t* data, uint8_t* out, uint8_t length);
 
  private:
   // Device and protocol constants
@@ -191,12 +202,21 @@ class MFRC522 {
     TestADCReg = 0x3B
   };
 
-  // Private methods
+  // Power cycle reset
   mfrc522_status hardReset();
+
+  // Chip register control
   mfrc522_status readRegister(mfrc522_register reg, uint8_t* out);
   mfrc522_status writeRegister(mfrc522_register reg, uint8_t in);
   mfrc522_status clearAndSetRegWithMask(mfrc522_register reg, uint8_t clear,
                                         uint8_t set);
   mfrc522_status clearRegisterWithMask(mfrc522_register reg, uint8_t mask);
   mfrc522_status setRegisterWithMask(mfrc522_register reg, uint8_t mask);
+
+  // Chip buffer control
+  mfrc522_status storeInternal();
+  mfrc522_status storeInternal(uint8_t* data);
+  mfrc522_status writeToFIFO(uint8_t data);
+  mfrc522_status writeToFIFO(uint8_t* data, uint8_t length);
+  mfrc522_status readFromFIFO(uint8_t* out, uint8_t length = 1);
 };

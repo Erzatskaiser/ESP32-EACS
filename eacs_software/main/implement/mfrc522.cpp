@@ -1,6 +1,8 @@
 // Header file
 #include "../header/mfrc522.hpp"
 
+#include <cstdint>
+
 // MFRC522 class constructor
 MFRC522::MFRC522(gpio_num_t* pins, core_num core) {
   // Store pins
@@ -61,6 +63,79 @@ MFRC522::MFRC522(gpio_num_t* pins, core_num core) {
   }
 }
 
+// idle: (none) --> (mfrc522_status)
+// No action, cancel current command execution
+mfrc522_status MFRC522::idle() {
+  return clearRegisterWithMask(CommandReg, 0x0F);
+}
+
+// storeInternal: (none) --> (mfrc522_status)
+// Trasfers FIFO data to buffer, using data already in FIFO
+mfrc522_status MFRC522::storeInternal() {
+  return clearAndSetRegWithMask(CommandReg, 0x0F, 0x01);
+}
+
+// storeInternal: (uint8_t*) --> (mfrc522_status)
+// Takes 25 bytes of input, writes to FIFO and transfer to buffer
+mfrc522_status MFRC522::storeInternal(uint8_t* data) {
+  // Reset FIFO buffer pointers
+  writeRegister(FIFOLevelReg, 0x80);
+
+  // Write 25 bytes of data to FIFO
+  writeToFIFO(data, 25);
+
+  // Execute MEM command, return status
+  return clearAndSetRegWithMask(CommandReg, 0x0F, 0x01);
+}
+
+// writeToFIFO: (uint8_t) --> (mfrc522_status)
+// Write a byte of data to the FIFO buffer
+mfrc522_status MFRC522::writeToFIFO(uint8_t data) {
+  return writeRegister(FIFODataReg, data);
+}
+
+// writeToFIFO: (uint8_t*, uint8_t) --> (mfrc522_status)
+// Writes data of given length to the FIFO buffer
+mfrc522_status MFRC522::writeToFIFO(uint8_t* data, uint8_t length) {
+  // Ensure size is not greater than buffer size
+  length %= fifo_size + 1;
+
+  // Write data to the buffer
+  for (size_t i = 0; i < length; i++) {
+    if (writeRegister(FIFODataReg, *data) != MFRC522_OK) return MFRC522_ERR;
+    ++data;
+  }
+
+  return MFRC522_OK;
+}
+
+// readFromFIFO: (uint8_t*, uint8_t) --> (mfrc522_status)
+// Reads data from the FIFO buffer and write to output variable
+mfrc522_status MFRC522::readFromFIFO(uint8_t* out, uint8_t length) {
+  for (size_t i = 0; i < length; i++) {
+    readRegister(FIFODataReg, out);
+    ++out;
+  }
+}
+
+// generateRandomID: (uint8_t*) --> (mfrc522_status)
+// Generate a 10 byte random ID number
+mfrc522_status MFRC522::generateRandomID(uint8_t* out) {
+  // TODO: Generate random data and write into array
+}
+
+// calculateCRC: (uint8_t*, uint8_t*, uint8_t) --> (mfrc522_status)
+// Performs CRC computations on the CRC coprocessor
+mfrc522_status MFRC522::calculateCRC(uint8_t* data, uint8_t* out,
+                                     uint8_t length) {
+  // Idle command to stop active comands
+  // Clear CRCIRw interrupt request bit
+  // Write data to fifo
+  // Start calculation using CMD register
+  // Wait for calculation to complete (read registers + timeout)
+  // Write result to output
+}
+
 // initializeChip: (none) --> (mfrc522_status)
 // Initializes the MFRC522 chip
 mfrc522_status MFRC522::initializeChip() {
@@ -97,28 +172,21 @@ mfrc522_status MFRC522::selfTest() {
   // Perform soft reset
   resetChip();
 
-  // Reset FIFO buffer pointers
-  writeRegister(FIFOLevelReg, 0x80);
-
-  // Write 25 bytes of 0x00 to the FIFO buffer
-  for (size_t i = 0; i < 25; i++) {
-    writeRegister(FIFODataReg, 0x00);
-  }
-
-  // Transfer bytes from FIFO to internal buffef
-  clearAndSetRegWithMask(CommandReg, 0x0F, 0x01);
+  // Write 0x00 to internal buffer
+  uint8_t zero_arr[25] = {0x00};
+  storeInternal(zero_arr);
 
   // Write 0x09 to AutoTestReg (enable self test)
   writeRegister(AutoTestReg, 0x09);
 
   // Write 0x00 to the FIFO buffer
-  writeRegister(FIFODataReg, 0x00);
+  writeToFIFO(0x00);
 
   // Start self test using the CalcCRC command
   clearAndSetRegWithMask(CommandReg, 0x0F, 0x03);
 
   // Test is initiated, completed when FIFO has 64 bytes or timeout
-  mfrc522_status status = MFRC522_ERR;
+  mfrc522_status status = MFRC522_TIMEOUT;
   uint32_t end_time = (esp_timer_get_time() / 1000) + 500;
   while (esp_timer_get_time() <= end_time) {
     // Read number of bytes in buffer from FIFOLevelReg
@@ -132,16 +200,14 @@ mfrc522_status MFRC522::selfTest() {
       break;
     }
   }
-  if (status == MFRC522_ERR) return status;
+  if (status == MFRC522_TIMEOUT) return status;
 
   // Write Idle command to stop CalCRC
-  clearRegisterWithMask(CommandReg, 0x0F);
+  idle();
 
   // Read 64 bytes from FIFO buffer
   uint8_t test_result[64];
-  for (size_t i = 0; i < 64; i++) {
-    readRegister(FIFODataReg, &test_result[i]);
-  }
+  readFromFIFO(test_result, 64);
 
   // Reset AutoTestReg register
   clearRegisterWithMask(AutoTestReg, 0x0F);
@@ -208,7 +274,7 @@ mfrc522_status MFRC522::wakeup() {
       return MFRC522_OK;
   }
 
-  return MFRC522_ERR;
+  return MFRC522_TIMEOUT;
 }
 
 // hibernate: (none) --> (mfrc522_status)
