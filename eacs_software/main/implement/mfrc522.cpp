@@ -113,9 +113,10 @@ mfrc522_status MFRC522::writeToFIFO(uint8_t* data, uint8_t length) {
 // Reads data from the FIFO buffer and write to output variable
 mfrc522_status MFRC522::readFromFIFO(uint8_t* out, uint8_t length) {
   for (size_t i = 0; i < length; i++) {
-    readRegister(FIFODataReg, out);
+    if (readRegister(FIFODataReg, out) != MFRC522_OK) return MFRC522_ERR;
     ++out;
   }
+  return MFRC522_OK;
 }
 
 // generateRandomID: (uint8_t*) --> (mfrc522_status)
