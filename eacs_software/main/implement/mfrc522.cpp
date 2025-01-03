@@ -1,9 +1,10 @@
 // Header file
 #include "../header/mfrc522.hpp"
 
-#include <cstdint>
-
-#include "esp_timer.h"
+// TODO:
+//  --> Function to Error Check after commands by reading ErrorReg
+//  --> For FIFO operations, check overflow/underflow WaterLevelReg
+//  --> Functions for communication with PICCS
 
 // MFRC522 class constructor
 MFRC522::MFRC522(gpio_num_t* pins, core_num core) {
@@ -90,6 +91,29 @@ mfrc522_status MFRC522::storeInternal(uint8_t* data) {
   return clearAndSetRegWithMask(CommandReg, 0x0F, 0x01);
 }
 
+// getfromInternal: (none) --> (mfrc522_status)
+// Transfers data from the internal buffer to the FIFO buffer
+mfrc522_status MFRC522::getFromInternal() {
+  // Reset FIFO buffer pointers
+  flushFIFO();
+
+  // Execute MEM command to write internal to FIFO
+  return clearAndSetRegWithMask(CommandReg, 0x0F, 0x01);
+}
+
+// getFromInternal: (uint8_t*) --> (mfrc522_status)
+// Transfers data from internal buffer to FIFO buffer, writing output in array
+mfrc522_status MFRC522::getFromInternal(uint8_t* out, uint8_t length) {
+  // Reset FIFO buffer pointers
+  flushFIFO();
+
+  // Execute MEM command to write internal to FIFO
+  clearAndSetRegWithMask(CommandReg, 0x0F, 0x01);
+
+  // Write length bytes from FIFO into output
+  return readFromFIFO(out, length);
+}
+
 // flushFIFO: (none) --> (mfrc522_status)
 // Flush the FIFO buffer by resetting buffer pointers
 mfrc522_status MFRC522::flushFIFO() {
@@ -130,7 +154,17 @@ mfrc522_status MFRC522::readFromFIFO(uint8_t* out, uint8_t length) {
 // generateRandomID: (uint8_t*) --> (mfrc522_status)
 // Generate a 10 byte random ID number
 mfrc522_status MFRC522::generateRandomID(uint8_t* out) {
-  // TODO: Generate random data and write into array
+  // Generate RandomID
+  mfrc522_status op1 = clearAndSetRegWithMask(CommandReg, 0x0F, 0x02);
+
+  // TODO: Maybe wait until command is executed?
+
+  // Get 10 bytes from Internal and write to output
+  mfrc522_status op2 = getFromInternal(out, 10);
+
+  // Update status
+  if (op1 == MFRC522_OK && op2 == MFRC522_OK) return MFRC522_OK;
+  return MFRC522_ERR;
 }
 
 // calculateCRC: (uint8_t*, uint8_t*, uint8_t) --> (mfrc522_status)

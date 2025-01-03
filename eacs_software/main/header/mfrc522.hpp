@@ -215,6 +215,8 @@ class MFRC522 {
 
   // Chip buffer control
   mfrc522_status flushFIFO();
+  mfrc522_status getFromInternal();
+  mfrc522_status getFromInternal(uint8_t* out, uint8_t length = 25);
   mfrc522_status storeInternal();
   mfrc522_status storeInternal(uint8_t* data);
   mfrc522_status writeToFIFO(uint8_t data);
