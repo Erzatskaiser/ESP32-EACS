@@ -3,6 +3,8 @@
 
 #include <cstdint>
 
+#include "esp_timer.h"
+
 // MFRC522 class constructor
 MFRC522::MFRC522(gpio_num_t* pins, core_num core) {
   // Store pins
@@ -79,13 +81,19 @@ mfrc522_status MFRC522::storeInternal() {
 // Takes 25 bytes of input, writes to FIFO and transfer to buffer
 mfrc522_status MFRC522::storeInternal(uint8_t* data) {
   // Reset FIFO buffer pointers
-  writeRegister(FIFOLevelReg, 0x80);
+  flushFIFO();
 
   // Write 25 bytes of data to FIFO
   writeToFIFO(data, 25);
 
   // Execute MEM command, return status
   return clearAndSetRegWithMask(CommandReg, 0x0F, 0x01);
+}
+
+// flushFIFO: (none) --> (mfrc522_status)
+// Flush the FIFO buffer by resetting buffer pointers
+mfrc522_status MFRC522::flushFIFO() {
+  return writeRegister(FIFOLevelReg, 0x80);
 }
 
 // writeToFIFO: (uint8_t) --> (mfrc522_status)
@@ -126,15 +134,51 @@ mfrc522_status MFRC522::generateRandomID(uint8_t* out) {
 }
 
 // calculateCRC: (uint8_t*, uint8_t*, uint8_t) --> (mfrc522_status)
-// Performs CRC computations on the CRC coprocessor
+// Performs CRC computations on the CRC coprocessor using user input
 mfrc522_status MFRC522::calculateCRC(uint8_t* data, uint8_t* out,
                                      uint8_t length) {
   // Idle command to stop active comands
-  // Clear CRCIRw interrupt request bit
-  // Write data to fifo
-  // Start calculation using CMD register
-  // Wait for calculation to complete (read registers + timeout)
-  // Write result to output
+  idle();
+
+  // Clear CRCIRq interrupt request bit
+  clearRegisterWithMask(DivIrqReg, 0x04);
+
+  // Write data to FIFO
+  flushFIFO();
+  writeToFIFO(data, length);
+
+  // Start calculation using CommandReg
+  setRegisterWithMask(CommandReg, 0x03);
+
+  // Set end time
+  uint32_t end_time = (esp_timer_get_time() / 1000) + 500;
+
+  // Iterate until timeout
+  while (esp_timer_get_time() <= end_time) {
+    // Read data from interupt request register
+    uint8_t data;
+    readRegister(DivIrqReg, &data);
+
+    // Check whether CalcCRC command is done
+    if (data & 0x04) {
+      // Stop command and idle
+      idle();
+
+      // Store results of CRC command
+      mfrc522_status r1_op = readRegister(CRCResultReg_LSB, out);
+      ++out;
+      mfrc522_status r2_op = readRegister(CRCResultReg_MSB, out);
+
+      // Update status code
+      if (r1_op == MFRC522_OK && r2_op == MFRC522_OK)
+        return MFRC522_OK;
+      else
+        return MFRC522_ERR;
+    }
+  }
+
+  // Return status code
+  return MFRC522_TIMEOUT;
 }
 
 // initializeChip: (none) --> (mfrc522_status)
