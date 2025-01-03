@@ -92,14 +92,80 @@ mfrc522_status MFRC522::initializeChip() {
 }
 
 // selfTest: (none) --> (mfrc522_status)
-// Performs a self test of the MFRC522
+// Performs a self test of the MFRC522 (described in 16.1.1 of datasheet)
 mfrc522_status MFRC522::selfTest() {
   // Perform soft reset
-  // Clear internal buffer, implement Config command
-  // Enable self test - write 0x09 to the AutoTestReg register
+  resetChip();
+
+  // Reset FIFO buffer pointers
+  writeRegister(FIFOLevelReg, 0x80);
+
+  // Write 25 bytes of 0x00 to the FIFO buffer
+  for (size_t i = 0; i < 25; i++) {
+    writeRegister(FIFODataReg, 0x00);
+  }
+
+  // Transfer bytes from FIFO to internal buffef
+  clearAndSetRegWithMask(CommandReg, 0x0F, 0x01);
+
+  // Write 0x09 to AutoTestReg (enable self test)
+  writeRegister(AutoTestReg, 0x09);
+
   // Write 0x00 to the FIFO buffer
-  // Start test with CalcCRC command
-  // After test complete, read 64 bytes from FIFO buffer
+  writeRegister(FIFODataReg, 0x00);
+
+  // Start self test using the CalcCRC command
+  clearAndSetRegWithMask(CommandReg, 0x0F, 0x03);
+
+  // Test is initiated, completed when FIFO has 64 bytes or timeout
+  mfrc522_status status = MFRC522_ERR;
+  uint32_t end_time = (esp_timer_get_time() / 1000) + 500;
+  while (esp_timer_get_time() <= end_time) {
+    // Read number of bytes in buffer from FIFOLevelReg
+    uint8_t size;
+    readRegister(FIFOLevelReg, &size);
+
+    // If size is > 64
+    size &= 0x7F;
+    if (size >= 64) {
+      status = MFRC522_OK;
+      break;
+    }
+  }
+  if (status == MFRC522_ERR) return status;
+
+  // Write Idle command to stop CalCRC
+  clearRegisterWithMask(CommandReg, 0x0F);
+
+  // Read 64 bytes from FIFO buffer
+  uint8_t test_result[64];
+  for (size_t i = 0; i < 64; i++) {
+    readRegister(FIFODataReg, &test_result[i]);
+  }
+
+  // Reset AutoTestReg register
+  clearRegisterWithMask(AutoTestReg, 0x0F);
+
+  // Read version register to get chip version
+  uint8_t version;
+  readRegister(VersionReg, &version);
+
+  // Check which test results to use
+  uint8_t reference[64];
+  if (version == 0x91)
+    memcpy(reference, fifo_test_v1, 64);
+  else if (version == 0x92)
+    memcpy(reference, fifo_test_v2, 64);
+
+  // Compare test results
+  for (size_t i = 0; i < 64; i++) {
+    if (reference[i] != test_result[i]) return MFRC522_ERR;
+  }
+
+  // TODO: Reinitialize MRFC522 might be needed
+
+  // Return status code
+  return MFRC522_OK;
 }
 
 // resetChip: (none) --> (mfrc522_status)
@@ -171,17 +237,11 @@ mfrc522_status MFRC522::adjustAntennaGain(mfrc522_gain gain) {
   // Check that desired gain is not equal to current gain
   if (gain == out) return MFRC522_OK;
 
-  // Clear register bits first
-  mfrc522_status clear_op = clearRegisterWithMask(RFCfgReg, 0x70);
-  if (clear_op != MFRC522_OK) return MFRC522_ERR;
-
-  // Make mask, and set value
-  uint8_t mask = gain << 4;
-  mfrc522_status set_op = setRegisterWithMask(RFCfgReg, mask);
-  if (set_op != MFRC522_OK) return MFRC522_ERR;
+  // Clear bits and set new gain value
+  mfrc522_status op = clearAndSetRegWithMask(RFCfgReg, 0x70, gain << 4);
 
   // Return status code
-  return MFRC522_OK;
+  return op;
 }
 
 // getAntennaGain: (mfrc522_gain*) --> (mfrc522_status)
@@ -236,7 +296,19 @@ mfrc522_status MFRC522::hardReset() {
   return MFRC522_OK;
 }
 
-// setRegisterWithMask: (mfrc522_register, uint8_t*) --> (mfrc522_status)
+// clearAndSetRegWithMask: (mfrc522_register, uint8_t, uint8_t) -->
+// (mfrc522_status) Clears and set bits within a specified register using
+// provided mask
+mfrc522_status MFRC522::clearAndSetRegWithMask(mfrc522_register reg,
+                                               uint8_t clear_mask,
+                                               uint8_t set_mask) {
+  mfrc522_status clear_op = clearRegisterWithMask(reg, clear_mask);
+  mfrc522_status set_op = setRegisterWithMask(reg, set_mask);
+  if (clear_op == MFRC522_OK && set_op == MFRC522_OK) return MFRC522_OK;
+  return MFRC522_ERR;
+}
+
+// setRegisterWithMask: (mfrc522_register, uint8_t) --> (mfrc522_status)
 // Sets bits within specified register using provided mask
 mfrc522_status MFRC522::setRegisterWithMask(mfrc522_register reg,
                                             uint8_t mask) {

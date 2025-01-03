@@ -195,6 +195,8 @@ class MFRC522 {
   mfrc522_status hardReset();
   mfrc522_status readRegister(mfrc522_register reg, uint8_t* out);
   mfrc522_status writeRegister(mfrc522_register reg, uint8_t in);
+  mfrc522_status clearAndSetRegWithMask(mfrc522_register reg, uint8_t clear,
+                                        uint8_t set);
   mfrc522_status clearRegisterWithMask(mfrc522_register reg, uint8_t mask);
   mfrc522_status setRegisterWithMask(mfrc522_register reg, uint8_t mask);
 };
