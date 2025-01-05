@@ -1,12 +1,16 @@
-// Header file
+﻿// Header file
 #include "../header/mfrc522.hpp"
+
+#include <cstdint>
 
 // TODO:
 //  --> Function to Error Check after commands by reading ErrorReg
 //  --> For FIFO operations, check overflow/underflow WaterLevelReg
 //  --> Functions for communication with PICCS
 
-// MFRC522 class constructor
+/*************************************************************
+MFRC522 class constructors
+*************************************************************/
 MFRC522::MFRC522(gpio_num_t* pins, core_num core) {
   // Store pins
   chipSelect_pin = *pins;
@@ -26,7 +30,7 @@ MFRC522::MFRC522(gpio_num_t* pins, core_num core) {
   spi_host_device_t hosts[]{SPI1_HOST, SPI2_HOST, SPI3_HOST};
 
   // Iterate over all hosts (skipping SPI1)
-  for (uint8_t i = 1; i < 2; i++) {
+  for (size_t i = 1; i < 2; i++) {
     //  Current host
     spi_host_device_t host = hosts[i];
 
@@ -66,154 +70,9 @@ MFRC522::MFRC522(gpio_num_t* pins, core_num core) {
   }
 }
 
-// idle: (none) --> (mfrc522_status)
-// No action, cancel current command execution
-mfrc522_status MFRC522::idle() {
-  return clearRegisterWithMask(CommandReg, 0x0F);
-}
-
-// storeInternal: (none) --> (mfrc522_status)
-// Trasfers FIFO data to buffer, using data already in FIFO
-mfrc522_status MFRC522::storeInternal() {
-  return clearAndSetRegWithMask(CommandReg, 0x0F, 0x01);
-}
-
-// storeInternal: (uint8_t*) --> (mfrc522_status)
-// Takes 25 bytes of input, writes to FIFO and transfer to buffer
-mfrc522_status MFRC522::storeInternal(uint8_t* data) {
-  // Reset FIFO buffer pointers
-  flushFIFO();
-
-  // Write 25 bytes of data to FIFO
-  writeToFIFO(data, 25);
-
-  // Execute MEM command, return status
-  return clearAndSetRegWithMask(CommandReg, 0x0F, 0x01);
-}
-
-// getfromInternal: (none) --> (mfrc522_status)
-// Transfers data from the internal buffer to the FIFO buffer
-mfrc522_status MFRC522::getFromInternal() {
-  // Reset FIFO buffer pointers
-  flushFIFO();
-
-  // Execute MEM command to write internal to FIFO
-  return clearAndSetRegWithMask(CommandReg, 0x0F, 0x01);
-}
-
-// getFromInternal: (uint8_t*) --> (mfrc522_status)
-// Transfers data from internal buffer to FIFO buffer, writing output in array
-mfrc522_status MFRC522::getFromInternal(uint8_t* out, uint8_t length) {
-  // Reset FIFO buffer pointers
-  flushFIFO();
-
-  // Execute MEM command to write internal to FIFO
-  clearAndSetRegWithMask(CommandReg, 0x0F, 0x01);
-
-  // Write length bytes from FIFO into output
-  return readFromFIFO(out, length);
-}
-
-// flushFIFO: (none) --> (mfrc522_status)
-// Flush the FIFO buffer by resetting buffer pointers
-mfrc522_status MFRC522::flushFIFO() {
-  return writeRegister(FIFOLevelReg, 0x80);
-}
-
-// writeToFIFO: (uint8_t) --> (mfrc522_status)
-// Write a byte of data to the FIFO buffer
-mfrc522_status MFRC522::writeToFIFO(uint8_t data) {
-  return writeRegister(FIFODataReg, data);
-}
-
-// writeToFIFO: (uint8_t*, uint8_t) --> (mfrc522_status)
-// Writes data of given length to the FIFO buffer
-mfrc522_status MFRC522::writeToFIFO(uint8_t* data, uint8_t length) {
-  // Ensure size is not greater than buffer size
-  length %= fifo_size + 1;
-
-  // Write data to the buffer
-  for (size_t i = 0; i < length; i++) {
-    if (writeRegister(FIFODataReg, *data) != MFRC522_OK) return MFRC522_ERR;
-    ++data;
-  }
-
-  return MFRC522_OK;
-}
-
-// readFromFIFO: (uint8_t*, uint8_t) --> (mfrc522_status)
-// Reads data from the FIFO buffer and write to output variable
-mfrc522_status MFRC522::readFromFIFO(uint8_t* out, uint8_t length) {
-  for (size_t i = 0; i < length; i++) {
-    if (readRegister(FIFODataReg, out) != MFRC522_OK) return MFRC522_ERR;
-    ++out;
-  }
-  return MFRC522_OK;
-}
-
-// generateRandomID: (uint8_t*) --> (mfrc522_status)
-// Generate a 10 byte random ID number
-mfrc522_status MFRC522::generateRandomID(uint8_t* out) {
-  // Generate RandomID
-  mfrc522_status op1 = clearAndSetRegWithMask(CommandReg, 0x0F, 0x02);
-
-  // TODO: Maybe wait until command is executed?
-
-  // Get 10 bytes from Internal and write to output
-  mfrc522_status op2 = getFromInternal(out, 10);
-
-  // Update status
-  if (op1 == MFRC522_OK && op2 == MFRC522_OK) return MFRC522_OK;
-  return MFRC522_ERR;
-}
-
-// calculateCRC: (uint8_t*, uint8_t*, uint8_t) --> (mfrc522_status)
-// Performs CRC computations on the CRC coprocessor using user input
-mfrc522_status MFRC522::calculateCRC(uint8_t* data, uint8_t* out,
-                                     uint8_t length) {
-  // Idle command to stop active comands
-  idle();
-
-  // Clear CRCIRq interrupt request bit
-  clearRegisterWithMask(DivIrqReg, 0x04);
-
-  // Write data to FIFO
-  flushFIFO();
-  writeToFIFO(data, length);
-
-  // Start calculation using CommandReg
-  setRegisterWithMask(CommandReg, 0x03);
-
-  // Set end time
-  uint32_t end_time = (esp_timer_get_time() / 1000) + 500;
-
-  // Iterate until timeout
-  while (esp_timer_get_time() <= end_time) {
-    // Read data from interupt request register
-    uint8_t data;
-    readRegister(DivIrqReg, &data);
-
-    // Check whether CalcCRC command is done
-    if (data & 0x04) {
-      // Stop command and idle
-      idle();
-
-      // Store results of CRC command
-      mfrc522_status r1_op = readRegister(CRCResultReg_LSB, out);
-      ++out;
-      mfrc522_status r2_op = readRegister(CRCResultReg_MSB, out);
-
-      // Update status code
-      if (r1_op == MFRC522_OK && r2_op == MFRC522_OK)
-        return MFRC522_OK;
-      else
-        return MFRC522_ERR;
-    }
-  }
-
-  // Return status code
-  return MFRC522_TIMEOUT;
-}
+/*************************************************************
+Chip state and power control
+*************************************************************/
 
 // initializeChip: (none) --> (mfrc522_status)
 // Initializes the MFRC522 chip
@@ -313,17 +172,18 @@ mfrc522_status MFRC522::selfTest() {
   return MFRC522_OK;
 }
 
-// resetChip: (none) --> (mfrc522_status)
-// Perform a soft reset of the MRFC522
-mfrc522_status MFRC522::resetChip() {
-  // Set command bits in command register
-  mfrc522_status write_op = setRegisterWithMask(CommandReg, SoftReset);
+// powerDown: (none) --> (mfrc522_status)
+// Turn off the MFRC522 module (reset on power on)
+mfrc522_status MFRC522::powerDown() {
+  esp_err_t op = gpio_set_level(reset_pin, 0);
+  if (op != ESP_OK) return MFRC522_ERR;
+  return MFRC522_OK;
+}
 
-  // Wait for operation to take effect
-  vTaskDelay(10 / portTICK_PERIOD_MS);
-
-  // Return status code
-  return write_op;
+// hibernate: (none) --> (mfrc522_status)
+// Hibernate the MFRC522 module (no reset on power on)
+mfrc522_status MFRC522::hibernate() {
+  return setRegisterWithMask(CommandReg, 0x10);
 }
 
 // wakeup: (none) --> (mfrc522_status)
@@ -356,19 +216,22 @@ mfrc522_status MFRC522::wakeup() {
   return MFRC522_TIMEOUT;
 }
 
-// hibernate: (none) --> (mfrc522_status)
-// Hibernate the MFRC522 module (no reset on power on)
-mfrc522_status MFRC522::hibernate() {
-  mfrc522_status status = setRegisterWithMask(CommandReg, 0x10);
-  return status;
+/*************************************************************
+Chip hardware control
+*************************************************************/
+
+// antennaOn: (none) --> (mfrc522_status)
+// Enables the antenna driving pins
+mfrc522_status MFRC522::antennaOn() {
+  mfrc522_status result = setRegisterWithMask(TxControlReg, 0x03);
+  return result;
 }
 
-// powerDown: (none) --> (mfrc522_status)
-// Turn off the MFRC522 module (reset on power on)
-mfrc522_status MFRC522::powerDown() {
-  esp_err_t op = gpio_set_level(reset_pin, 0);
-  if (op != ESP_OK) return MFRC522_ERR;
-  return MFRC522_OK;
+// antennaOff: (none) --> (mfrc522_status)
+// Disables the antenna driving pins
+mfrc522_status MFRC522::antennaOff() {
+  mfrc522_status result = clearRegisterWithMask(TxControlReg, 0x03);
+  return result;
 }
 
 // adjustAntennaGain: (mfrc522_gain) --> (mfrc522_status)
@@ -408,19 +271,139 @@ mfrc522_status MFRC522::getAntennaGain(mfrc522_gain* out) {
   return MFRC522_OK;
 }
 
-// antennaOn: (none) --> (mfrc522_status)
-// Enables the antenna driving pins
-mfrc522_status MFRC522::antennaOn() {
-  mfrc522_status result = setRegisterWithMask(TxControlReg, 0x03);
-  return result;
+/*************************************************************
+Chip features control
+*************************************************************/
+
+// idle: (none) --> (mfrc522_status)
+// No action, cancel current command execution
+mfrc522_status MFRC522::idle() {
+  return clearRegisterWithMask(CommandReg, 0x0F);
 }
 
-// antennaOff: (none) --> (mfrc522_status)
-// Disables the antenna driving pins
-mfrc522_status MFRC522::antennaOff() {
-  mfrc522_status result = clearRegisterWithMask(TxControlReg, 0x03);
-  return result;
+// resetChip: (none) --> (mfrc522_status)
+// Perform a soft reset of the MRFC522
+mfrc522_status MFRC522::resetChip() {
+  // Set command bits in command register
+  mfrc522_status write_op = setRegisterWithMask(CommandReg, SoftReset);
+
+  // Wait for operation to take effect
+  vTaskDelay(10 / portTICK_PERIOD_MS);
+
+  // Return status code
+  return write_op;
 }
+
+// generateRandomID: (uint8_t*) --> (mfrc522_status)
+// Generate a 10 byte random ID number
+mfrc522_status MFRC522::generateRandomID(uint8_t* out) {
+  // Generate RandomID
+  mfrc522_status op1 = clearAndSetRegWithMask(CommandReg, 0x0F, 0x02);
+
+  // TODO: Maybe wait until command is executed?
+
+  // Get 10 bytes from Internal and write to output
+  mfrc522_status op2 = getFromInternal(out, 10);
+
+  // Update status
+  if (op1 == MFRC522_OK && op2 == MFRC522_OK) return MFRC522_OK;
+  return MFRC522_ERR;
+}
+
+// calculateCRC: (uint8_t*, uint8_t*, uint8_t) --> (mfrc522_status)
+// Performs CRC computations on the CRC coprocessor using user input
+mfrc522_status MFRC522::calculateCRC(uint8_t* data, uint8_t* out,
+                                     uint8_t length) {
+  // Idle command to stop active commands
+  idle();
+
+  // Clear CRCIRq interrupt request bit
+  clearRegisterWithMask(DivIrqReg, 0x04);
+
+  // Write data to FIFO
+  flushFIFO();
+  writeToFIFO(data, length);
+
+  // Start calculation using CommandReg
+  setRegisterWithMask(CommandReg, 0x03);
+
+  // Set end time
+  uint32_t end_time = (esp_timer_get_time() / 1000) + 500;
+
+  // Iterate until timeout
+  while (esp_timer_get_time() <= end_time) {
+    // Read data from interrupt request register
+    uint8_t data;
+    readRegister(DivIrqReg, &data);
+
+    // Check whether CalcCRC command is done
+    if (data & 0x04) {
+      // Stop command and idle
+      idle();
+
+      // Store results of CRC command
+      mfrc522_status r1_op = readRegister(CRCResultReg_LSB, out);
+      ++out;
+      mfrc522_status r2_op = readRegister(CRCResultReg_MSB, out);
+
+      // Update status code
+      if (r1_op == MFRC522_OK && r2_op == MFRC522_OK)
+        return MFRC522_OK;
+      else
+        return MFRC522_ERR;
+    }
+  }
+
+  // Return status code
+  return MFRC522_TIMEOUT;
+}
+
+// calculateCRC: (uint8_t*, uint8_t) --> (mfrc522_status)
+// Perfroms CRC computations on CRC coprocessor using FIFO data
+mfrc522_status MFRC522::calculateCRC(uint8_t* out, uint8_t length) {
+  // Idle command to stop other active commands
+  idle();
+
+  // Clear CRCIRq interrupt request bit
+  clearRegisterWithMask(DivIrqReg, 0x04);
+
+  // Start calculation using CommandReg
+  setRegisterWithMask(CommandReg, 0x03);
+
+  // Set end time
+  uint32_t end_time = (esp_timer_get_time() / 1000) + 500;
+
+  // Iterate until timeout
+  while (esp_timer_get_time() <= end_time) {
+    // Read data from interrupt request register
+    uint8_t data;
+    readRegister(DivIrqReg, &data);
+
+    // Check if CalcCRC command is done
+    if (data & 0x04) {
+      // Stop command and idle
+      idle();
+
+      // Store results of CRC command
+      mfrc522_status r1_op = readRegister(CRCResultReg_LSB, out);
+      ++out;
+      mfrc522_status r2_op = readRegister(CRCResultReg_MSB, out);
+
+      // Update status code
+      if (r1_op == MFRC522_OK && r2_op == MFRC522_OK)
+        return MFRC522_OK;
+      else
+        return MFRC522_ERR;
+    }
+  }
+
+  // Return status code
+  return MFRC522_TIMEOUT;
+}
+
+/*************************************************************
+Power cycle reset
+*************************************************************/
 
 // hardReset: (none) --> (mfrc522_status)
 // Hard reset the MFRC522 chip by writing the reset pin low
@@ -441,56 +424,38 @@ mfrc522_status MFRC522::hardReset() {
   return MFRC522_OK;
 }
 
-// clearAndSetRegWithMask: (mfrc522_register, uint8_t, uint8_t) -->
-// (mfrc522_status) Clears and set bits within a specified register using
-// provided mask
-mfrc522_status MFRC522::clearAndSetRegWithMask(mfrc522_register reg,
-                                               uint8_t clear_mask,
-                                               uint8_t set_mask) {
-  mfrc522_status clear_op = clearRegisterWithMask(reg, clear_mask);
-  mfrc522_status set_op = setRegisterWithMask(reg, set_mask);
-  if (clear_op == MFRC522_OK && set_op == MFRC522_OK) return MFRC522_OK;
+/*************************************************************
+Chip register control
+*************************************************************/
+
+// readRegister: (mfrc522_register, uint8_t*) --> (mfrc522_status)
+// Reads the data in a register and writes to output pointer, returning status
+mfrc522_status MFRC522::readRegister(mfrc522_register reg, uint8_t* out) {
+  // Use bitwise operations to get read
+  uint8_t addr = 0x80 | (reg << 1);
+
+  // Instantiate and zero out transaction
+  spi_transaction_t read_transact;
+  memset(&read_transact, 0, sizeof(read_transact));
+
+  // Initialize transaction
+  uint8_t recv_buff = 0x00;
+  read_transact.length = 16;
+  read_transact.rxlength = 8;
+  read_transact.tx_buffer = &addr;
+  read_transact.rx_buffer = &addr;
+
+  // Transmit transaction (thread-safe)
+  taskENTER_CRITICAL(&mfrc522_lock);
+  esp_err_t op1 = spi_device_transmit(spi_handle, &read_transact);
+  taskEXIT_CRITICAL(&mfrc522_lock);
+
+  // Write results to output
+  *out = recv_buff;
+
+  // Return error code
+  if (op1 == ESP_OK) return MFRC522_OK;
   return MFRC522_ERR;
-}
-
-// setRegisterWithMask: (mfrc522_register, uint8_t) --> (mfrc522_status)
-// Sets bits within specified register using provided mask
-mfrc522_status MFRC522::setRegisterWithMask(mfrc522_register reg,
-                                            uint8_t mask) {
-  // Obtain the current value
-  uint8_t currVal = 0x00;
-  mfrc522_status read_status = readRegister(reg, &currVal);
-  if (read_status != MFRC522_OK) return MFRC522_ERR;
-
-  // Apply the mask to the current value
-  uint8_t newVal = currVal | mask;
-
-  // Write the new value
-  mfrc522_status write_status = writeRegister(reg, newVal);
-  if (write_status != MFRC522_OK) return MFRC522_ERR;
-
-  // Return status
-  return MFRC522_OK;
-}
-
-// clearRegisterWithMask: (mfrc522_register, uint8_t*) --> (mfrc522_status)
-// Clear bits within specified register using provided mask
-mfrc522_status MFRC522::clearRegisterWithMask(mfrc522_register reg,
-                                              uint8_t mask) {
-  // Obtain the current value
-  uint8_t currVal = 0x00;
-  mfrc522_status read_status = readRegister(reg, &currVal);
-  if (read_status != MFRC522_OK) return MFRC522_ERR;
-
-  // Apply the mask to the current value
-  uint8_t newVal = currVal & ~mask;
-
-  // Write the new value
-  mfrc522_status write_status = writeRegister(reg, newVal);
-  if (write_status != MFRC522_OK) return MFRC522_ERR;
-
-  // Return status
-  return MFRC522_OK;
 }
 
 // writeRegister: (mfrc522_register, uint8_t*) --> (mfrc522_status)
@@ -526,32 +491,137 @@ mfrc522_status MFRC522::writeRegister(mfrc522_register reg, uint8_t in) {
   return MFRC522_ERR;
 }
 
-// readRegister: (mfrc522_register, uint8_t*) --> (mfrc522_status)
-// Reads the data in a register and writes to output pointer, returning status
-mfrc522_status MFRC522::readRegister(mfrc522_register reg, uint8_t* out) {
-  // Use bitwise operations to get read
-  uint8_t addr = 0x80 | (reg << 1);
-
-  // Instantiate and zero out transaction
-  spi_transaction_t read_transact;
-  memset(&read_transact, 0, sizeof(read_transact));
-
-  // Initialize transaction
-  uint8_t recv_buff = 0x00;
-  read_transact.length = 16;
-  read_transact.rxlength = 8;
-  read_transact.tx_buffer = &addr;
-  read_transact.rx_buffer = &addr;
-
-  // Transmit transaction (thread-safe)
-  taskENTER_CRITICAL(&mfrc522_lock);
-  esp_err_t op1 = spi_device_transmit(spi_handle, &read_transact);
-  taskEXIT_CRITICAL(&mfrc522_lock);
-
-  // Write results to output
-  *out = recv_buff;
-
-  // Return error code
-  if (op1 == ESP_OK) return MFRC522_OK;
+// clearAndSetRegWithMask: (mfrc522_register, uint8_t, uint8_t) -->
+// (mfrc522_status) Clears and set bits within a specified register using
+// provided mask
+mfrc522_status MFRC522::clearAndSetRegWithMask(mfrc522_register reg,
+                                               uint8_t clear_mask,
+                                               uint8_t set_mask) {
+  mfrc522_status clear_op = clearRegisterWithMask(reg, clear_mask);
+  mfrc522_status set_op = setRegisterWithMask(reg, set_mask);
+  if (clear_op == MFRC522_OK && set_op == MFRC522_OK) return MFRC522_OK;
   return MFRC522_ERR;
+}
+
+// clearRegisterWithMask: (mfrc522_register, uint8_t*) --> (mfrc522_status)
+// Clear bits within specified register using provided mask
+mfrc522_status MFRC522::clearRegisterWithMask(mfrc522_register reg,
+                                              uint8_t mask) {
+  // Obtain the current value
+  uint8_t currVal = 0x00;
+  mfrc522_status read_status = readRegister(reg, &currVal);
+  if (read_status != MFRC522_OK) return MFRC522_ERR;
+
+  // Apply the mask to the current value
+  uint8_t newVal = currVal & ~mask;
+
+  // Write the new value
+  mfrc522_status write_status = writeRegister(reg, newVal);
+  if (write_status != MFRC522_OK) return MFRC522_ERR;
+
+  // Return status
+  return MFRC522_OK;
+}
+
+// setRegisterWithMask: (mfrc522_register, uint8_t) --> (mfrc522_status)
+// Sets bits within specified register using provided mask
+mfrc522_status MFRC522::setRegisterWithMask(mfrc522_register reg,
+                                            uint8_t mask) {
+  // Obtain the current value
+  uint8_t currVal = 0x00;
+  mfrc522_status read_status = readRegister(reg, &currVal);
+  if (read_status != MFRC522_OK) return MFRC522_ERR;
+
+  // Apply the mask to the current value
+  uint8_t newVal = currVal | mask;
+
+  // Write the new value
+  mfrc522_status write_status = writeRegister(reg, newVal);
+  if (write_status != MFRC522_OK) return MFRC522_ERR;
+
+  // Return status
+  return MFRC522_OK;
+}
+
+/*************************************************************
+Chip buffer control
+*************************************************************/
+
+// flushFIFO: (none) --> (mfrc522_status)
+// Flush the FIFO buffer by resetting buffer pointers
+mfrc522_status MFRC522::flushFIFO() {
+  return writeRegister(FIFOLevelReg, 0x80);
+}
+
+// getfromInternal: (none) --> (mfrc522_status)
+// Transfers data from the internal buffer to the FIFO buffer
+mfrc522_status MFRC522::getFromInternal() {
+  // Reset FIFO buffer pointers
+  flushFIFO();
+
+  // Execute MEM command to write internal to FIFO
+  return clearAndSetRegWithMask(CommandReg, 0x0F, 0x01);
+}
+
+// getFromInternal: (uint8_t*) --> (mfrc522_status)
+// Transfers data from internal buffer to FIFO buffer, writing output in array
+mfrc522_status MFRC522::getFromInternal(uint8_t* out, uint8_t length) {
+  // Reset FIFO buffer pointers
+  flushFIFO();
+
+  // Execute MEM command to write internal to FIFO
+  clearAndSetRegWithMask(CommandReg, 0x0F, 0x01);
+
+  // Write length bytes from FIFO into output
+  return readFromFIFO(out, length);
+}
+
+// storeInternal: (none) --> (mfrc522_status)
+// Trasfers FIFO data to buffer, using data already in FIFO
+mfrc522_status MFRC522::storeInternal() {
+  return clearAndSetRegWithMask(CommandReg, 0x0F, 0x01);
+}
+
+// storeInternal: (uint8_t*) --> (mfrc522_status)
+// Takes 25 bytes of input, writes to FIFO and transfer to buffer
+mfrc522_status MFRC522::storeInternal(uint8_t* data) {
+  // Reset FIFO buffer pointers
+  flushFIFO();
+
+  // Write 25 bytes of data to FIFO
+  writeToFIFO(data, 25);
+
+  // Execute MEM command, return status
+  return clearAndSetRegWithMask(CommandReg, 0x0F, 0x01);
+}
+
+// writeToFIFO: (uint8_t) --> (mfrc522_status)
+// Write a byte of data to the FIFO buffer
+mfrc522_status MFRC522::writeToFIFO(uint8_t data) {
+  return writeRegister(FIFODataReg, data);
+}
+
+// writeToFIFO: (uint8_t*, uint8_t) --> (mfrc522_status)
+// Writes data of given length to the FIFO buffer
+mfrc522_status MFRC522::writeToFIFO(uint8_t* data, uint8_t length) {
+  // Ensure size is not greater than buffer size
+  length %= fifo_size + 1;
+
+  // Write data to the buffer
+  for (size_t i = 0; i < length; i++) {
+    if (writeRegister(FIFODataReg, *data) != MFRC522_OK) return MFRC522_ERR;
+    ++data;
+  }
+
+  return MFRC522_OK;
+}
+
+// readFromFIFO: (uint8_t*, uint8_t) --> (mfrc522_status)
+// Reads data from the FIFO buffer and write to output variable
+mfrc522_status MFRC522::readFromFIFO(uint8_t* out, uint8_t length) {
+  for (size_t i = 0; i < length; i++) {
+    if (readRegister(FIFODataReg, out) != MFRC522_OK) return MFRC522_ERR;
+    ++out;
+  }
+  return MFRC522_OK;
 }
