@@ -485,11 +485,11 @@ mfrc522_status MFRC522::executeCommand(mfrc522_commands command,
   }
   if (status == MFRC522_TIMEOUT) return status;
 
-  // Check for errors based on error function (read registers)
+  // TODO: Check for errors based on error function (read registers)
 
-  // Return data back
+  // TODO: Return data back
 
-  // Perform CRC Check
+  // TODO: Perform CRC Check
 
   // Return status
   return MFRC522_OK;
