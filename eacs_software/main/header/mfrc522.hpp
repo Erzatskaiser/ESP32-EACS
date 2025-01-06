@@ -17,25 +17,18 @@
 
 // Status codes for class methods
 enum mfrc522_status : uint8_t {
-  MFRC522_OK = 0x00,      /* Success code */
-  MFRC522_ERR = 0x01,     /* Generic error code */
-  MFRC522_COLL = 0x02,    /* Collision error code */
-  MFRC522_TIMEOUT = 0x03, /* Timeout error code */
-  MFRC522_FULL = 0x04,    /* Buffer is not big enough */
-  MFRC522_CRC = 0x05,     /* CRC_A does not match */
-  MFRC522_NAK = 0xFF,     /* PICC responded with NAK */
-};
-
-// Values for the RFCfg register (receiver gain configuration)
-enum mfrc522_gain : uint8_t {
-  dB18 = 0x00,
-  db23 = 0x01,
-  db18_2 = 0x02,
-  db23_3 = 0x3,
-  db33 = 0x04,
-  db38 = 0x05,
-  db43 = 0x06,
-  db48 = 0x07
+  MFRC522_OK = 0x00,       /* Success code */
+  MFRC522_ERR = 0x01,      /* Generic error code */
+  MFRC522_WrERR = 0x02,    /* Write error code */
+  MFRC522_TEMP = 0x03,     /* Temperature error code */
+  MFRC522_COLL = 0x04,     /* Collision error code */
+  MFRC522_PAR = 0x05,      /* Parity check failed error code */
+  MFRC522_TIMEOUT = 0x06,  /* Timeout error code */
+  MFRC522_PROTOCOL = 0x07, /* Protocol error code */
+  MFRC522_FULL = 0x08,     /* Buffer is not big enough */
+  MFRC522_CRC = 0x09,      /* CRC_A does not match */
+  MFRC522_SPACE = 0x10,    /* Not enough space to write to buffer */
+  MFRC522_NAK = 0xFF,      /* PICC responded with NAK */
 };
 
 // MFRC522 Class
@@ -44,12 +37,40 @@ class MFRC522 {
   // Class constructor
   MFRC522(gpio_num_t* pins, core_num core = CORE0);
 
+  // Values for the RFCfg register (receiver gain configuration)
+  enum mfrc522_gain : uint8_t {
+    dB18 = 0x00,
+    db23 = 0x01,
+    db18_2 = 0x02,
+    db23_3 = 0x3,
+    db33 = 0x04,
+    db38 = 0x05,
+    db43 = 0x06,
+    db48 = 0x07
+  };
+
+  // Commands of the MFRC522 ship
+  enum mfrc522_commands : uint8_t {
+    Idle = 0x00,             /* No actions */
+    Mem = 0x01,              /* Store 25 bytes in internal buffer */
+    GenerateRandomID = 0x02, /* Generate random 10-byte ID number */
+    CalcCRC = 0x03,          /* Activate CRC coprocessor or perform self test */
+    Transmit = 0x04,         /* Transmit data from FIFO buffer */
+    NoCmdChange = 0x07,      /* No command change */
+    Receive = 0x08,          /* Activate receiver circuits */
+    Transceive = 0xC, /* Transmit data from FIFO and activate receiver after */
+    MFAuthent = 0xE,  /* Perform Mifare standard auth as reader */
+    SoftReset = 0xF,  /* Reset MFRC522 */
+  };
+
   // Chip state and power control
   mfrc522_status initializeChip();
   mfrc522_status selfTest();
   mfrc522_status powerDown();
   mfrc522_status hibernate();
   mfrc522_status wakeup();
+  mfrc522_status checkForErrors();
+  mfrc522_status checkForErrors(uint8_t* out);
 
   // Chip hardware control
   mfrc522_status antennaOn();
@@ -63,6 +84,10 @@ class MFRC522 {
   mfrc522_status generateRandomID(uint8_t* out);
   mfrc522_status calculateCRC(uint8_t* out, uint8_t length);
   mfrc522_status calculateCRC(uint8_t* data, uint8_t* out, uint8_t length);
+  mfrc522_status executeCommand(mfrc522_commands command, uint8_t irq_bits,
+                                uint8_t* in = nullptr, uint8_t in_len = 0,
+                                uint8_t* out = nullptr, uint8_t out_len = 0,
+                                bool checkCRC = true);
 
  private:
   // Device and protocol constants
@@ -97,20 +122,6 @@ class MFRC522 {
       0x84, 0x4D, 0xB3, 0xCC, 0xD2, 0x1B, 0x81, 0x5D, 0x48, 0x76, 0xD5,
       0x71, 0x61, 0x21, 0xA9, 0x86, 0x96, 0x83, 0x38, 0xCF, 0x9D, 0x5B,
       0x6D, 0xDC, 0x15, 0xBA, 0x3E, 0x7D, 0x95, 0x3B, 0x2F};
-
-  // Commands of the MFRC522 ship
-  enum mfrc522_commands : uint8_t {
-    Idle = 0x00,             /* No actions */
-    Mem = 0x01,              /* Store 25 bytes in internal buffer */
-    GenerateRandomID = 0x02, /* Generate random 10-byte ID number */
-    CalcCRC = 0x03,          /* Activate CRC coprocessor or perform self test */
-    Transmit = 0x04,         /* Transmit data from FIFO buffer */
-    NoCmdChange = 0x07,      /* No command change */
-    Receive = 0x08,          /* Activate receiver circuits */
-    Transceive = 0xC, /* Transmit data from FIFO and activate receiver after */
-    MFAuthent = 0xE,  /* Perform Mifare standard auth as reader */
-    SoftReset = 0xF,  /* Reset MFRC522 */
-  };
 
   // Commands sent to PICC (defined by standards)
   enum picc_commands : uint8_t {

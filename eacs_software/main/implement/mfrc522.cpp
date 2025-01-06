@@ -216,6 +216,43 @@ mfrc522_status MFRC522::wakeup() {
   return MFRC522_TIMEOUT;
 }
 
+// checkForError: (none) --> (mfrc522_status)
+// Checks for errors, returning the first matching error directly
+mfrc522_status MFRC522::checkForErrors() {
+  // Read from the error register
+  uint8_t out;
+  readRegister(ErrorReg, &out);
+
+  // Return appropriate error message
+  if (out & 0x80)
+    return MFRC522_WrERR;
+  else if (out & 0x40)
+    return MFRC522_TEMP;
+  else if (out & 0x10)
+    return MFRC522_FULL;
+  else if (out & 0x08)
+    return MFRC522_COLL;
+  else if (out & 0x04)
+    return MFRC522_CRC;
+  else if (out & 0x02)
+    return MFRC522_PAR;
+  else if (out & 0x01)
+    return MFRC522_PROTOCOL;
+
+  // No error found
+  return MFRC522_OK;
+}
+
+// checkForErrors: (uintu_t*) --> (none)
+// Checks for errors, write error code to output and return first matching error
+mfrc522_status MFRC522::checkForErrors(uint8_t* out) {
+  // Read from error register and write to output
+  readRegister(ErrorReg, out);
+
+  // Return first  matching error status
+  return checkForErrors();
+}
+
 /*************************************************************
 Chip hardware control
 *************************************************************/
@@ -399,6 +436,63 @@ mfrc522_status MFRC522::calculateCRC(uint8_t* out, uint8_t length) {
 
   // Return status code
   return MFRC522_TIMEOUT;
+}
+
+// executCommand: (mfrc522_commands, uint8_t, uint8_t*, uint8_t, uint8_t*,
+//                uint8_t, bool) --> (mfrc522_status)
+// Generic chip command execution, return output if requested
+mfrc522_status MFRC522::executeCommand(mfrc522_commands command,
+                                       uint8_t irq_bits, uint8_t* in,
+                                       uint8_t in_len, uint8_t* out,
+                                       uint8_t out_len, bool checkCRC) {
+  // Execute idle to stop active commands
+  idle();
+
+  // Clear interrupt request bits
+  clearRegisterWithMask(ComIrqReg, 0x7F);
+
+  // Flush FIFO buffer
+  flushFIFO();
+
+  // Write input data to FIFO buffer (if required)
+  if (in != nullptr) {
+    writeToFIFO(in, in_len);
+  }
+
+  // Execute provided command
+  setRegisterWithMask(CommandReg, command);
+
+  // If transceiving, start transmission
+  if (command == Transceive) setRegisterWithMask(BitFramingReg, 0x80);
+
+  // Wait for completion or timeout (based on irq_bits)
+  uint32_t end_time = (esp_timer_get_time() / 1000) + 100;
+  mfrc522_status status = MFRC522_TIMEOUT;
+  while (esp_timer_get_time() <= end_time) {
+    // Read interrupt request bits
+    uint8_t out;
+    readRegister(ComIrqReg, &out);
+
+    // Check against requirements
+    if (out & irq_bits) {
+      status = MFRC522_OK;
+      break;
+    }
+
+    // Check for timer IRQ
+    else if (out & 0x01)
+      break;
+  }
+  if (status == MFRC522_TIMEOUT) return status;
+
+  // Check for errors based on error function (read registers)
+
+  // Return data back
+
+  // Perform CRC Check
+
+  // Return status
+  return MFRC522_OK;
 }
 
 /*************************************************************
